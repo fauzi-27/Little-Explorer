@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Prevent pinch zooming and ensure proper scaling across iPhone, iPad, Samsung, Huawei, etc. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Tetris Shark</title>
+    <!-- Load Fredoka font for a bubbly, kid-friendly look -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Load Tone.js for cheerful underwater sound effects without external audio files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        :root {
+            --ocean-top: #00d2ff;
+            --ocean-mid: #0082c8;
+            --ocean-bottom: #004e92;
+            --sand-light: #ffe29a;
+            --sand-dark: #f6c26b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            /* Disable text selection and double-tap zoom on mobile touchscreens */
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: manipulation;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Fredoka', cursive, sans-serif;
+            background: linear-gradient(180deg, var(--ocean-top) 0%, var(--ocean-mid) 60%, var(--ocean-bottom) 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* --- SEAFLOOR DECORATION & BUBBLES --- */
+        #ocean-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        /* Sunbeams from top */
+        .sunbeams {
+            position: absolute;
+            top: -10%;
+            left: 10%;
+            width: 80%;
+            height: 70%;
+            background: radial-gradient(ellipse at top, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 70%);
+            transform: skewX(-15deg);
+        }
+
+        /* Sand Dunes at the bottom */
+        .seafloor-svg {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 28vh;
+            min-height: 150px;
+        }
+
+        /* Swaying Seaweed Animation */
+        @keyframes sway {
+            0%, 100% { transform: rotate(-5deg); }
+            50% { transform: rotate(6deg); }
+        }
+        .seaweed {
+            transform-origin: bottom center;
+            animation: sway 4s ease-in-out infinite;
+        }
+        .seaweed-fast {
+            transform-origin: bottom center;
+            animation: sway 3s ease-in-out infinite reverse;
+        }
+
+        /* Floating Bubbles */
+        .bubble {
+            position: absolute;
+            bottom: -40px;
+            background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.2) 60%, rgba(255, 255, 255, 0.5) 100%);
+            border-radius: 50%;
+            border: 1.5px solid rgba(255, 255, 255, 0.7);
+            animation: rise linear forwards;
+        }
+
+        @keyframes rise {
+            0% {
+                transform: translateY(0) translateX(0) scale(0.8);
+                opacity: 0;
+            }
+            15% {
+                opacity: 0.85;
+            }
+            50% {
+                transform: translateY(-50vh) translateX(15px) scale(1);
+            }
+            85% {
+                opacity: 0.85;
+            }
+            100% {
+                transform: translateY(-110vh) translateX(-15px) scale(1.1);
+                opacity: 0;
+            }
+        }
+
+        /* --- MAIN APP CONTAINER --- */
+        #app-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 520px;
+            height: 100dvh; /* Dynamic viewport height for mobile browsers */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: env(safe-area-inset-top, 10px) 12px env(safe-area-inset-bottom, 12px) 12px;
+        }
+
+        /* --- TOP NAVIGATION BAR --- */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            flex-shrink: 0;
+        }
+
+        .nav-btn {
+            background: linear-gradient(180deg, #ffdf4d 0%, #ffb703 100%);
+            border: 3px solid #ffffff;
+            border-radius: 20px;
+            padding: 8px 14px;
+            color: #5c3a00;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 5px 0 #c98a00, 0 8px 15px rgba(0,0,0,0.25);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .nav-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #c98a00, 0 3px 6px rgba(0,0,0,0.25);
+        }
+
+        .nav-btn.pink-btn {
+            background: linear-gradient(180deg, #ff85b3 0%, #ff4785 100%);
+            color: #ffffff;
+            box-shadow: 0 5px 0 #b81d52, 0 8px 15px rgba(0,0,0,0.25);
+        }
+        .nav-btn.pink-btn:active {
+            box-shadow: 0 1px 0 #b81d52;
+        }
+
+        .score-pill {
+            background: rgba(255, 255, 255, 0.92);
+            border: 3px solid #38bdf8;
+            border-radius: 22px;
+            padding: 6px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+
+        .score-label {
+            font-size: 0.9rem;
+            color: #0284c7;
+            font-weight: 700;
+        }
+
+        .score-value {
+            font-size: 1.4rem;
+            color: #ff6b00;
+            font-weight: 700;
+        }
+
+        /* --- GAME BOARD AREA --- */
+        .board-wrapper {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 0; /* Allows flex shrinking */
+            padding: 4px 0;
+            position: relative;
+        }
+
+        .canvas-frame {
+            position: relative;
+            background: rgba(255, 255, 255, 0.22);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            border: 5px solid #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0, 40, 85, 0.4), inset 0 0 20px rgba(255, 255, 255, 0.4);
+            padding: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            max-height: 100%;
+            aspect-ratio: 1 / 2;
+        }
+
+        canvas#game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 16px;
+            background: rgba(0, 55, 110, 0.35);
+        }
+
+        /* Screen Shake Effect on Row Clear */
+        @keyframes boardShake {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            20% { transform: translate(-6px, 4px) rotate(-1.5deg); }
+            40% { transform: translate(6px, -4px) rotate(1.5deg); }
+            60% { transform: translate(-5px, -3px) rotate(-1deg); }
+            80% { transform: translate(5px, 3px) rotate(1deg); }
+        }
+        .shake-board {
+            animation: boardShake 0.45s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* Dramatic Banner Popup on Row Clear */
+        #celebration-banner {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: linear-gradient(180deg, #ffde00 0%, #ff8800 100%);
+            border: 4px solid #ffffff;
+            color: #ffffff;
+            text-shadow: 0 3px 0 #b34700;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 1.8rem;
+            font-weight: 700;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 25;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.35);
+            opacity: 0;
+        }
+
+        @keyframes popCelebrate {
+            0% { transform: translate(-50%, -50%) scale(0.3) rotate(-8deg); opacity: 0; }
+            25% { transform: translate(-50%, -50%) scale(1.15) rotate(4deg); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scale(1) rotate(-2deg); opacity: 1; }
+            80% { transform: translate(-50%, -65%) scale(1.05) rotate(0deg); opacity: 1; }
+            100% { transform: translate(-50%, -90%) scale(0.8); opacity: 0; }
+        }
+        .show-celebrate {
+            animation: popCelebrate 1.1s ease-out forwards;
+        }
+
+        /* --- TODDLER-FRIENDLY BIG TOUCH CONTROLS --- */
+        .controls-area {
+            flex-shrink: 0;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            padding-top: 6px;
+            padding-bottom: 4px;
+        }
+
+        .ctrl-btn {
+            height: 68px;
+            border: 4px solid #ffffff;
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: #ffffff;
+            cursor: pointer;
+            transition: transform 0.08s;
+            position: relative;
+        }
+
+        .ctrl-btn svg {
+            width: 30px;
+            height: 30px;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
+        }
+
+        .ctrl-btn:active, .ctrl-btn.pressed {
+            transform: translateY(5px) scale(0.96);
+        }
+
+        /* Left Button - Blue */
+        .btn-left {
+            background: linear-gradient(180deg, #4cc9f0 0%, #0096c7 100%);
+            box-shadow: 0 6px 0 #005f80, 0 8px 15px rgba(0,0,0,0.25);
+        }
+        .btn-left:active, .btn-left.pressed { box-shadow: 0 1px 0 #005f80; }
+
+        /* Right Button - Blue */
+        .btn-right {
+            background: linear-gradient(180deg, #4cc9f0 0%, #0096c7 100%);
+            box-shadow: 0 6px 0 #005f80, 0 8px 15px rgba(0,0,0,0.25);
+        }
+        .btn-right:active, .btn-right.pressed { box-shadow: 0 1px 0 #005f80; }
+
+        /* Rotate Button - Pink */
+        .btn-rotate {
+            background: linear-gradient(180deg, #ff70a6 0%, #ff2a7a 100%);
+            box-shadow: 0 6px 0 #a80041, 0 8px 15px rgba(0,0,0,0.25);
+        }
+        .btn-rotate:active, .btn-rotate.pressed { box-shadow: 0 1px 0 #a80041; }
+
+        /* Fast Drop Button - Green */
+        .btn-fast {
+            background: linear-gradient(180deg, #52e365 0%, #1db934 100%);
+            box-shadow: 0 6px 0 #0e701c, 0 8px 15px rgba(0,0,0,0.25);
+        }
+        .btn-fast:active, .btn-fast.pressed { box-shadow: 0 1px 0 #0e701c; }
+
+        /* --- OVERLAY SCREENS (HOME & GAME OVER) --- */
+        .overlay-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            background: rgba(0, 62, 122, 0.72);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            text-align: center;
+            transition: opacity 0.3s ease;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .card-box {
+            background: linear-gradient(180deg, #ffffff 0%, #e0f7ff 100%);
+            border: 6px solid #ffde00;
+            border-radius: 36px;
+            padding: 28px 24px;
+            max-width: 380px;
+            width: 100%;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .game-title {
+            font-size: 2.6rem;
+            line-height: 1.05;
+            font-weight: 700;
+            color: #ff6b00;
+            text-shadow: 0 4px 0 #ffe066, 0 6px 10px rgba(0,0,0,0.15);
+            letter-spacing: 1px;
+        }
+
+        .game-title span {
+            color: #0096c7;
+            display: block;
+            font-size: 3rem;
+        }
+
+        @keyframes floatShark {
+            0%, 100% { transform: translateY(0px) rotate(-3deg); }
+            50% { transform: translateY(-10px) rotate(3deg); }
+        }
+        .mascot-shark {
+            width: 140px;
+            height: 100px;
+            animation: floatShark 2.8s ease-in-out infinite;
+        }
+
+        .big-play-btn {
+            background: linear-gradient(180deg, #52e365 0%, #1db934 100%);
+            border: 5px solid #ffffff;
+            border-radius: 30px;
+            padding: 16px 42px;
+            font-family: inherit;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #ffffff;
+            text-shadow: 0 3px 0 #0e701c;
+            box-shadow: 0 8px 0 #0e701c, 0 12px 25px rgba(0,0,0,0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .big-play-btn:active {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #0e701c;
+        }
+
+        /* Toddler Mode Toggle Pill */
+        .speed-selector {
+            display: flex;
+            background: #bae6fd;
+            padding: 5px;
+            border-radius: 20px;
+            gap: 6px;
+            border: 2px solid #7dd3fc;
+        }
+
+        .speed-opt {
+            padding: 8px 14px;
+            border-radius: 15px;
+            border: none;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            background: transparent;
+            color: #0369a1;
+            transition: all 0.2s;
+        }
+
+        .speed-opt.active {
+            background: #ffde00;
+            color: #5c3a00;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+        }
+
+        /* Responsive adjustments for very small phones or wide tablets */
+        @media (max-height: 640px) {
+            .ctrl-btn { height: 56px; border-radius: 18px; }
+            .ctrl-btn svg { width: 24px; height: 24px; }
+            .nav-btn { padding: 6px 10px; font-size: 0.9rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SEAFLOOR BACKGROUND WITH CORAL, SAND, STARFISH & BUBBLES -->
+    <div id="ocean-bg">
+        <div class="sunbeams"></div>
+        <!-- Bubbles will be dynamically injected here -->
+        <div id="bubble-container"></div>
+
+        <!-- SVG Seafloor Scene -->
+        <svg class="seafloor-svg" viewBox="0 0 1440 320" preserveAspectRatio="none">
+            <!-- Back Coral & Seaweed -->
+            <g class="seaweed" style="transform-origin: 180px 260px;">
+                <path d="M180,260 Q150,190 185,130 Q210,80 175,30 Q155,80 165,135 Q140,195 180,260 Z" fill="#2ec4b6"/>
+                <path d="M210,265 Q240,200 215,150 Q195,100 225,60 Q245,105 230,155 Q250,205 210,265 Z" fill="#20a4f3"/>
+            </g>
+            <g class="seaweed-fast" style="transform-origin: 1240px 260px;">
+                <path d="M1240,260 Q1210,180 1250,120 Q1270,70 1235,20 Q1215,75 1230,125 Q1195,185 1240,260 Z" fill="#38b000"/>
+                <path d="M1280,265 Q1310,195 1285,140 Q1265,90 1295,50 Q1315,95 1300,145 Q1320,200 1280,265 Z" fill="#70e000"/>
+            </g>
+
+            <!-- Pink Branching Coral Left -->
+            <path d="M80,270 L80,190 Q60,160 40,170 Q30,140 65,145 Q75,110 95,120 Q115,100 125,135 Q155,130 145,165 Q120,175 105,195 L105,270 Z" fill="#ff5d8f"/>
+            <!-- Orange Tube Coral Right -->
+            <path d="M1110,275 L1110,170 A15,15 0 0,1 1140,170 L1140,275 Z" fill="#ff9f1c"/>
+            <path d="M1145,275 L1145,140 A18,18 0 0,1 1181,140 L1181,275 Z" fill="#ffbf69"/>
+            <path d="M1185,275 L1185,185 A14,14 0 0,1 1213,185 L1213,275 Z" fill="#ff7b00"/>
+
+            <!-- Back Sand Dune -->
+            <path fill="#f6c26b" d="M0,224 C320,170 540,280 860,230 C1140,185 1300,240 1440,210 L1440,320 L0,320 Z"/>
+            <!-- Front Sand Dune -->
+            <path fill="#ffe29a" d="M0,255 C380,295 720,205 1120,255 C1280,275 1380,245 1440,250 L1440,320 L0,320 Z"/>
+
+            <!-- Cute Smiling Starfish Left -->
+            <g transform="translate(310, 275) rotate(-12)">
+                <polygon points="0,-32 9,-10 32,-10 14,5 20,28 0,15 -20,28 -14,5 -32,-10 -9,-10" fill="#ff595e" stroke="#ffca3a" stroke-width="3" stroke-linejoin="round"/>
+                <circle cx="-6" cy="-3" r="2.5" fill="#222"/>
+                <circle cx="6" cy="-3" r="2.5" fill="#222"/>
+                <path d="M-4,4 Q0,9 4,4" stroke="#222" stroke-width="2" fill="none" stroke-linecap="round"/>
+            </g>
+
+            <!-- Cute Pink Shell Right -->
+            <g transform="translate(980, 282) rotate(10)">
+                <path d="M-25,10 Q-30,-20 0,-25 Q30,-20 25,10 Z" fill="#ff85a1"/>
+                <path d="M-15,10 L-10,-20 M0,10 L0,-24 M15,10 L10,-20" stroke="#fbb1bd" stroke-width="2.5"/>
+            </g>
+        </svg>
+    </div>
+
+    <!-- MAIN GAME UI -->
+    <div id="app-container">
+        <!-- Top Bar: Home, Score, Restart -->
+        <header class="top-bar">
+            <button id="btn-home" class="nav-btn" aria-label="Home">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z"/>
+                </svg>
+                <span>Home</span>
+            </button>
+
+            <div class="score-pill">
+                <span class="score-label">STARS</span>
+                <span id="score-display" class="score-value">0</span>
+            </div>
+
+            <button id="btn-restart" class="nav-btn pink-btn" aria-label="Restart">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                    <path d="M3 3v5h5"/>
+                </svg>
+                <span>Restart</span>
+            </button>
+        </header>
+
+        <!-- Center Game Canvas -->
+        <main class="board-wrapper">
+            <div id="canvas-frame" class="canvas-frame">
+                <canvas id="game-canvas"></canvas>
+                <!-- Dramatic Row Clear Celebration Text -->
+                <div id="celebration-banner">DOO DOO DOO!</div>
+            </div>
+        </main>
+
+        <!-- Bottom Touch Controls for iPhone, iPad, Android Tablets & Phones -->
+        <footer class="controls-area">
+            <button id="ctrl-left" class="ctrl-btn btn-left" aria-label="Move Left">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 18l-6-6 6-6"/>
+                </svg>
+                <span>LEFT</span>
+            </button>
+
+            <button id="ctrl-rotate" class="ctrl-btn btn-rotate" aria-label="Rotate Shark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                    <path d="M21 3v5h-5"/>
+                </svg>
+                <span>SPIN</span>
+            </button>
+
+            <button id="ctrl-fast" class="ctrl-btn btn-fast" aria-label="Fast Swim Down">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+                </svg>
+                <span>FAST</span>
+            </button>
+
+            <button id="ctrl-right" class="ctrl-btn btn-right" aria-label="Move Right">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18l6-6-6-6"/>
+                </svg>
+                <span>RIGHT</span>
+            </button>
+        </footer>
+    </div>
+
+    <!-- HOME SCREEN OVERLAY -->
+    <div id="home-screen" class="overlay-screen">
+        <div class="card-box">
+            <!-- Cute Baby Shark SVG Mascot -->
+            <svg class="mascot-shark" viewBox="0 0 200 140">
+                <!-- Dorsal Fin -->
+                <path d="M85,42 Q95,5 118,42 Z" fill="#ffde00" stroke="#f59e0b" stroke-width="4" stroke-linejoin="round"/>
+                <!-- Tail Fin -->
+                <path d="M35,75 L8,48 Q18,75 8,102 L35,75 Z" fill="#ffde00" stroke="#f59e0b" stroke-width="4" stroke-linejoin="round"/>
+                <!-- Body -->
+                <ellipse cx="105" cy="75" rx="72" ry="42" fill="#ffde00" stroke="#f59e0b" stroke-width="4"/>
+                <!-- White Belly -->
+                <path d="M45,82 Q105,125 172,82 Q115,98 45,82 Z" fill="#ffffff"/>
+                <!-- Side Fin -->
+                <path d="M95,88 Q75,120 112,104 Z" fill="#ffde00" stroke="#f59e0b" stroke-width="3.5" stroke-linejoin="round"/>
+                <!-- Big Cute Eye -->
+                <circle cx="145" cy="64" r="13" fill="#ffffff" stroke="#222" stroke-width="2.5"/>
+                <circle cx="148" cy="63" r="7" fill="#111111"/>
+                <circle cx="150" cy="60" r="3" fill="#ffffff"/>
+                <!-- Rosy Cheek -->
+                <ellipse cx="132" cy="78" rx="7" ry="4" fill="#ff70a6" opacity="0.7"/>
+                <!-- Happy Smile -->
+                <path d="M148,84 Q162,92 172,82" stroke="#222" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            </svg>
+
+            <h1 class="game-title">TETRIS <span>SHARK</span></h1>
+
+            <!-- Toddler Speed Selector -->
+            <div class="speed-selector" role="group" aria-label="Game Speed">
+                <button id="mode-toddler" class="speed-opt active">Toddler (Slow)</button>
+                <button id="mode-kid" class="speed-opt">Big Kid (Fun)</button>
+            </div>
+
+            <button id="btn-play" class="big-play-btn">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z"/>
+                </svg>
+                <span>PLAY!</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- GAME OVER / CELEBRATION SCREEN OVERLAY -->
+    <div id="gameover-screen" class="overlay-screen hidden">
+        <div class="card-box">
+            <h2 class="game-title" style="font-size: 2.2rem;">GREAT SWIM!</h2>
+            <p style="font-size: 1.2rem; color: #0284c7; font-weight: 700;">You collected</p>
+            <div style="font-size: 3.5rem; font-weight: 700; color: #ff6b00; line-height: 1;">
+                <span id="final-score">0</span> ⭐
+            </div>
+            <button id="btn-play-again" class="big-play-btn">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                    <path d="M3 3v5h5"/>
+                </svg>
+                <span>PLAY AGAIN</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * TETRIS SHARK - Game Engine & Toddler UI Logic
+         * Uses HTML5 Canvas, Web Audio via Tone.js, and responsive touch/swipe controls.
+         */
+
+        // --- 1. CONTINUOUS SEAFLOOR BUBBLES GENERATOR ---
+        const bubbleContainer = document.getElementById('bubble-container');
+        function spawnBubble() {
+            const bubble = document.createElement('div');
+            bubble.classList.add('bubble');
+            const size = Math.random() * 22 + 8; // 8px to 30px
+            const leftPos = Math.random() * 100; // 0% to 100%
+            const duration = Math.random() * 5 + 5; // 5s to 10s
+
+            bubble.style.width = `${size}px`;
+            bubble.style.height = `${size}px`;
+            bubble.style.left = `${leftPos}%`;
+            bubble.style.animationDuration = `${duration}s`;
+
+            bubbleContainer.appendChild(bubble);
+
+            // Clean up DOM after animation ends
+            setTimeout(() => {
+                if (bubble.parentNode) bubble.remove();
+            }, duration * 1000);
+        }
+        // Spawn bubbles continuously
+        setInterval(spawnBubble, 450);
+        for (let i = 0; i < 10; i++) setTimeout(spawnBubble, i * 250);
+
+        // --- 2. SOUND EFFECTS ENGINE (Tone.js - No external files needed) ---
+        let synth = null;
+        let audioReady = false;
+
+        async function initAudio() {
+            if (audioReady) return;
+            try {
+                await Tone.start();
+                synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "triangle" },
+                    envelope: { attack: 0.02, decay: 0.15, sustain: 0.1, release: 0.4 }
+                }).toDestination();
+                synth.volume.value = -6;
+                audioReady = true;
+            } catch (e) {
+                console.warn("Audio init skipped:", e);
+            }
+        }
+
+        function playSound(type) {
+            if (!audioReady || !synth) return;
+            const now = Tone.now();
+            try {
+                if (type === 'move') {
+                    synth.triggerAttackRelease("C5", "32n", now);
+                } else if (type === 'rotate') {
+                    synth.triggerAttackRelease(["E5", "G5"], "32n", now);
+                } else if (type === 'drop') {
+                    synth.triggerAttackRelease("G3", "16n", now);
+                } else if (type === 'clear') {
+                    // Cheerful "Baby Shark" style arpeggio fanfare!
+                    synth.triggerAttackRelease("D5", "16n", now);
+                    synth.triggerAttackRelease("E5", "16n", now + 0.12);
+                    synth.triggerAttackRelease("G5", "8n", now + 0.24);
+                    synth.triggerAttackRelease("G5", "8n", now + 0.40);
+                    synth.triggerAttackRelease(["G5", "B5", "D6"], "4n", now + 0.56);
+                } else if (type === 'gameover') {
+                    synth.triggerAttackRelease("G4", "8n", now);
+                    synth.triggerAttackRelease("E4", "8n", now + 0.18);
+                    synth.triggerAttackRelease("C4", "4n", now + 0.36);
+                }
+            } catch (e) {}
+        }
+
+        // --- 3. SHARK BLOCK COLORS (STRICTLY ORANGE, PINK, BLUE, YELLOW, GREEN) ---
+        const SHARK_PALETTE = {
+            yellow: { main: '#FFDE00', dark: '#E0B000', light: '#FFF380', belly: '#FFFFFF' }, // Baby Shark
+            pink:   { main: '#FF66A3', dark: '#D63375', light: '#FFB3D1', belly: '#FFF0F6' }, // Mommy Shark
+            blue:   { main: '#00A8FF', dark: '#0077B6', light: '#80D4FF', belly: '#E6F7FF' }, // Daddy Shark
+            green:  { main: '#38E54D', dark: '#1FA830', light: '#99F5A4', belly: '#EBFFEE' }, // Grandma/Brother Shark
+            orange: { main: '#FF8C00', dark: '#CC6600', light: '#FFC278', belly: '#FFF5E6' }  // Grandpa/Sister Shark
+        };
+        const COLOR_KEYS = ['yellow', 'pink', 'blue', 'green', 'orange'];
+
+        // Standard Tetromino Shapes
+        const SHAPES = [
+            [[1, 1, 1, 1]],                         // I
+            [[1, 1], [1, 1]],                       // O
+            [[0, 1, 0], [1, 1, 1]],                 // T
+            [[1, 0, 0], [1, 1, 1]],                 // J
+            [[0, 0, 1], [1, 1, 1]],                 // L
+            [[0, 1, 1], [1, 1, 0]],                 // S
+            [[1, 1, 0], [0, 1, 1]]                  // Z
+        ];
+
+        // --- 4. GAME STATE & CONFIGURATION ---
+        const COLS = 10;
+        const ROWS = 20;
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const canvasFrame = document.getElementById('canvas-frame');
+
+        let board = [];
+        let currentPiece = null;
+        let score = 0;
+        let isGameRunning = false;
+        let isPaused = false;
+        let baseDropInterval = 1150; // Toddler friendly slow speed by default
+        let dropCounter = 0;
+        let lastTime = 0;
+        let animationFrameId = null;
+
+        // Dramatic Row Clear Effects State
+        let particles = [];
+        let flashRows = [];
+        let flashAlpha = 0;
+
+        // Resize canvas smoothly to fit device screen (iPhone, iPad, Android)
+        function resizeCanvas() {
+            const rect = canvasFrame.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            // Subtract border/padding space
+            const innerW = rect.width - 12;
+            const innerH = rect.height - 12;
+            canvas.width = Math.floor(innerW * dpr);
+            canvas.height = Math.floor(innerH * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // Create empty 10x20 grid
+        function createEmptyBoard() {
+            return Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+        }
+
+        // Spawn a new Shark Piece with one of the 5 allowed colors
+        function spawnPiece() {
+            const shapeIdx = Math.floor(Math.random() * SHAPES.length);
+            const colorKey = COLOR_KEYS[Math.floor(Math.random() * COLOR_KEYS.length)];
+            const matrix = SHAPES[shapeIdx].map(row => [...row]);
+
+            currentPiece = {
+                matrix: matrix,
+                colorKey: colorKey,
+                x: Math.floor(COLS / 2) - Math.ceil(matrix[0].length / 2),
+                y: 0
+            };
+
+            // Check immediate collision (Game Over)
+            if (checkCollision(board, currentPiece)) {
+                triggerGameOver();
+            }
+        }
+
+        // Collision Detection
+        function checkCollision(grid, piece, offsetX = 0, offsetY = 0, testMatrix = piece.matrix) {
+            for (let r = 0; r < testMatrix.length; r++) {
+                for (let c = 0; c < testMatrix[r].length; c++) {
+                    if (!testMatrix[r][c]) continue;
+                    const newX = piece.x + c + offsetX;
+                    const newY = piece.y + r + offsetY;
+
+                    if (newX < 0 || newX >= COLS || newY >= ROWS) {
+                        return true;
+                    }
+                    if (newY >= 0 && grid[newY][newX] !== null) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Rotate Matrix 90 Degrees Clockwise
+        function rotateMatrix(matrix) {
+            const rows = matrix.length;
+            const cols = matrix[0].length;
+            const rotated = Array.from({ length: cols }, () => Array(rows).fill(0));
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    rotated[c][rows - 1 - r] = matrix[r][c];
+                }
+            }
+            return rotated;
+        }
+
+        // --- 5. DRAWING EACH SHARK BLOCK (WITH EYES AND FINS!) ---
+        function drawSharkBlock(ctx, gridX, gridY, cellSize, colorKey, isGhost = false) {
+            const x = gridX * cellSize;
+            const y = gridY * cellSize;
+            const palette = SHARK_PALETTE[colorKey];
+
+            ctx.save();
+            if (isGhost) {
+                ctx.globalAlpha = 0.25;
+            }
+
+            const pad = cellSize * 0.08;
+            const bx = x + pad;
+            const by = y + pad;
+            const bw = cellSize - pad * 2;
+            const bh = cellSize - pad * 2;
+            const radius = cellSize * 0.24;
+
+            // 1. Top Dorsal Shark Fin
+            ctx.fillStyle = palette.dark;
+            ctx.beginPath();
+            ctx.moveTo(bx + bw * 0.35, by + 2);
+            ctx.quadraticCurveTo(bx + bw * 0.48, by - cellSize * 0.16, bx + bw * 0.68, by + 2);
+            ctx.closePath();
+            ctx.fill();
+
+            // 2. Side Pectoral Fins (Left & Right)
+            ctx.fillStyle = palette.dark;
+            // Left Fin
+            ctx.beginPath();
+            ctx.moveTo(bx + 2, by + bh * 0.55);
+            ctx.lineTo(bx - cellSize * 0.11, by + bh * 0.72);
+            ctx.lineTo(bx + 2, by + bh * 0.82);
+            ctx.closePath();
+            ctx.fill();
+
+            // Right Fin
+            ctx.beginPath();
+            ctx.moveTo(bx + bw - 2, by + bh * 0.55);
+            ctx.lineTo(bx + bw + cellSize * 0.11, by + bh * 0.72);
+            ctx.lineTo(bx + bw - 2, by + bh * 0.82);
+            ctx.closePath();
+            ctx.fill();
+
+            // 3. Rounded Shark Block Body
+            ctx.fillStyle = palette.main;
+            ctx.beginPath();
+            ctx.roundRect(bx, by, bw, bh, radius);
+            ctx.fill();
+
+            // Top glossy highlight
+            ctx.fillStyle = palette.light;
+            ctx.beginPath();
+            ctx.roundRect(bx + bw * 0.12, by + bh * 0.08, bw * 0.76, bh * 0.22, radius * 0.5);
+            ctx.fill();
+
+            // 4. White Shark Belly at bottom of block
+            ctx.fillStyle = palette.belly;
+            ctx.beginPath();
+            ctx.roundRect(bx + bw * 0.1, by + bh * 0.68, bw * 0.8, bh * 0.26, [0, 0, radius * 0.8, radius * 0.8]);
+            ctx.fill();
+
+            // 5. Cute Big Toddler Eyes (Left & Right)
+            const eyeRadius = Math.max(2.5, cellSize * 0.13);
+            const leftEyeX = bx + bw * 0.30;
+            const rightEyeX = bx + bw * 0.70;
+            const eyeY = by + bh * 0.44;
+
+            // White sclera
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(leftEyeX, eyeY, eyeRadius, 0, Math.PI * 2);
+            ctx.arc(rightEyeX, eyeY, eyeRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Black pupils
+            ctx.fillStyle = '#111827';
+            ctx.beginPath();
+            ctx.arc(leftEyeX + eyeRadius * 0.15, eyeY, eyeRadius * 0.58, 0, Math.PI * 2);
+            ctx.arc(rightEyeX - eyeRadius * 0.15, eyeY, eyeRadius * 0.58, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye sparkle
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(leftEyeX + eyeRadius * 0.3, eyeY - eyeRadius * 0.25, eyeRadius * 0.25, 0, Math.PI * 2);
+            ctx.arc(rightEyeX, eyeY - eyeRadius * 0.25, eyeRadius * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Cute tiny smile
+            ctx.strokeStyle = '#111827';
+            ctx.lineWidth = Math.max(1.2, cellSize * 0.05);
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.arc(bx + bw * 0.5, eyeY + eyeRadius * 0.8, eyeRadius * 0.55, 0.15 * Math.PI, 0.85 * Math.PI);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // --- 6. DRAMATIC ROW CLEAR EFFECT (EXPLOSION, SHOCKWAVE, BUBBLES & STARS) ---
+        function triggerDramaticRowClear(clearedRowIndices, cellSize) {
+            playSound('clear');
+
+            // 1. Board Shake Animation
+            canvasFrame.classList.remove('shake-board');
+            void canvasFrame.offsetWidth; // trigger reflow
+            canvasFrame.classList.add('shake-board');
+
+            // 2. Pop-up Celebration Banner
+            const phrases = ["DOO DOO DOO!", "SUPER SHARK!", "AWESOME!", "YAY! SPLASH!", "CHOMP CHOMP!"];
+            const banner = document.getElementById('celebration-banner');
+            banner.textContent = phrases[Math.floor(Math.random() * phrases.length)];
+            banner.classList.remove('show-celebrate');
+            void banner.offsetWidth;
+            banner.classList.add('show-celebrate');
+
+            // 3. White/Gold Flash on cleared rows
+            flashRows = [...clearedRowIndices];
+            flashAlpha = 1.0;
+
+            // 4. Spawn 75 colorful Starfish, Bubbles & Sparkle Particles
+            const particleColors = ['#FFDE00', '#FF66A3', '#00A8FF', '#38E54D', '#FF8C00', '#FFFFFF'];
+            clearedRowIndices.forEach(rowIdx => {
+                const centerY = (rowIdx + 0.5) * cellSize;
+                for (let i = 0; i < 45; i++) {
+                    const px = Math.random() * (COLS * cellSize);
+                    const angle = (Math.random() * Math.PI * 2);
+                    const speed = Math.random() * 6 + 2;
+                    particles.push({
+                        x: px,
+                        y: centerY,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed - 2.5,
+                        size: Math.random() * 8 + 4,
+                        color: particleColors[Math.floor(Math.random() * particleColors.length)],
+                        alpha: 1,
+                        isStar: Math.random() > 0.45,
+                        rotation: Math.random() * Math.PI
+                    });
+                }
+            });
+        }
+
+        function updateAndDrawParticles(ctx, cellSize) {
+            // Draw row flash wave
+            if (flashAlpha > 0 && flashRows.length > 0) {
+                ctx.save();
+                ctx.fillStyle = `rgba(255, 250, 180, ${flashAlpha})`;
+                flashRows.forEach(r => {
+                    ctx.fillRect(0, r * cellSize, COLS * cellSize, cellSize);
+                });
+                ctx.restore();
+                flashAlpha -= 0.05;
+            }
+
+            // Draw explosive celebration particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.15; // gentle underwater gravity
+                p.alpha -= 0.018;
+                p.rotation += 0.08;
+
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation);
+                ctx.fillStyle = p.color;
+
+                if (p.isStar) {
+                    // Draw 5-point star
+                    ctx.beginPath();
+                    for (let s = 0; s < 5; s++) {
+                        ctx.lineTo(Math.cos((18 + s * 72) * Math.PI / 180) * p.size,
+                                   -Math.sin((18 + s * 72) * Math.PI / 180) * p.size);
+                        ctx.lineTo(Math.cos((54 + s * 72) * Math.PI / 180) * (p.size * 0.45),
+                                   -Math.sin((54 + s * 72) * Math.PI / 180) * (p.size * 0.45));
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    // Draw glowing bubble
+                    ctx.beginPath();
+                    ctx.arc(0, 0, p.size * 0.7, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        }
+
+        // --- 7. GAME MECHANICS ---
+        function lockPiece() {
+            const cellSize = canvas.clientWidth / COLS;
+            for (let r = 0; r < currentPiece.matrix.length; r++) {
+                for (let c = 0; c < currentPiece.matrix[r].length; c++) {
+                    if (currentPiece.matrix[r][c]) {
+                        const boardY = currentPiece.y + r;
+                        const boardX = currentPiece.x + c;
+                        if (boardY < 0) {
+                            triggerGameOver();
+                            return;
+                        }
+                        board[boardY][boardX] = currentPiece.colorKey;
+                    }
+                }
+            }
+            playSound('drop');
+
+            // Check for completed rows
+            let clearedIndices = [];
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (board[r].every(cell => cell !== null)) {
+                    clearedIndices.push(r);
+                }
+            }
+
+            if (clearedIndices.length > 0) {
+                // Trigger dramatic celebration!
+                triggerDramaticRowClear(clearedIndices, cellSize);
+
+                // Remove cleared rows and add empty rows at top
+                clearedIndices.sort((a, b) => a - b);
+                clearedIndices.forEach(rowIndex => {
+                    board.splice(rowIndex, 1);
+                    board.unshift(Array(COLS).fill(null));
+                });
+
+                // Update Score (100 per row, bonus for multi-row)
+                const pointsEarned = clearedIndices.length * 100 * clearedIndices.length;
+                score += pointsEarned;
+                document.getElementById('score-display').textContent = score;
+            }
+
+            spawnPiece();
+        }
+
+        function moveLeft() {
+            if (!isGameRunning || isPaused || !currentPiece) return;
+            if (!checkCollision(board, currentPiece, -1, 0)) {
+                currentPiece.x--;
+                playSound('move');
+            }
+        }
+
+        function moveRight() {
+            if (!isGameRunning || isPaused || !currentPiece) return;
+            if (!checkCollision(board, currentPiece, 1, 0)) {
+                currentPiece.x++;
+                playSound('move');
+            }
+        }
+
+        function rotatePiece() {
+            if (!isGameRunning || isPaused || !currentPiece) return;
+            const rotated = rotateMatrix(currentPiece.matrix);
+            // Wall kick support so toddlers never get stuck near edges
+            const kicks = [0, -1, 1, -2, 2];
+            for (let kick of kicks) {
+                if (!checkCollision(board, currentPiece, kick, 0, rotated)) {
+                    currentPiece.x += kick;
+                    currentPiece.matrix = rotated;
+                    playSound('rotate');
+                    return;
+                }
+            }
+        }
+
+        function softDrop() {
+            if (!isGameRunning || isPaused || !currentPiece) return;
+            if (!checkCollision(board, currentPiece, 0, 1)) {
+                currentPiece.y++;
+                dropCounter = 0;
+            } else {
+                lockPiece();
+            }
+        }
+
+        // Calculate Ghost Piece Y position (visual landing guide for toddlers!)
+        function getGhostY() {
+            let ghostY = currentPiece.y;
+            while (!checkCollision(board, currentPiece, 0, ghostY - currentPiece.y + 1)) {
+                ghostY++;
+            }
+            return ghostY;
+        }
+
+        // --- 8. MAIN RENDER LOOP ---
+        function draw() {
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            const cellSize = width / COLS;
+
+            ctx.clearRect(0, 0, width, height);
+
+            // Subtle underwater grid lines to help toddlers align blocks
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+            ctx.lineWidth = 1;
+            for (let c = 1; c < COLS; c++) {
+                ctx.beginPath();
+                ctx.moveTo(c * cellSize, 0);
+                ctx.lineTo(c * cellSize, height);
+                ctx.stroke();
+            }
+            for (let r = 1; r < ROWS; r++) {
+                ctx.beginPath();
+                ctx.moveTo(0, r * cellSize);
+                ctx.lineTo(width, r * cellSize);
+                ctx.stroke();
+            }
+
+            // Draw locked shark blocks on the board
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (board[r][c]) {
+                        drawSharkBlock(ctx, c, r, cellSize, board[r][c], false);
+                    }
+                }
+            }
+
+            // Draw Ghost Piece & Active Falling Shark Piece
+            if (currentPiece) {
+                const ghostY = getGhostY();
+                for (let r = 0; r < currentPiece.matrix.length; r++) {
+                    for (let c = 0; c < currentPiece.matrix[r].length; c++) {
+                        if (currentPiece.matrix[r][c]) {
+                            // Draw helpful ghost shadow
+                            drawSharkBlock(ctx, currentPiece.x + c, ghostY + r, cellSize, currentPiece.colorKey, true);
+                            // Draw active shark block
+                            drawSharkBlock(ctx, currentPiece.x + c, currentPiece.y + r, cellSize, currentPiece.colorKey, false);
+                        }
+                    }
+                }
+            }
+
+            // Draw Row Clear Dramatic Particles
+            updateAndDrawParticles(ctx, cellSize);
+        }
+
+        function gameLoop(time = 0) {
+            if (!isGameRunning) return;
+
+            const deltaTime = time - lastTime;
+            lastTime = time;
+
+            if (!isPaused) {
+                dropCounter += deltaTime;
+                if (dropCounter > baseDropInterval) {
+                    softDrop();
+                    dropCounter = 0;
+                }
+            }
+
+            draw();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- 9. GAME STATE CONTROLS (START, RESTART, HOME, GAME OVER) ---
+        function startGame() {
+            initAudio();
+            document.getElementById('home-screen').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+
+            resizeCanvas();
+            board = createEmptyBoard();
+            score = 0;
+            particles = [];
+            flashRows = [];
+            document.getElementById('score-display').textContent = '0';
+
+            isGameRunning = true;
+            isPaused = false;
+            dropCounter = 0;
+            lastTime = performance.now();
+
+            spawnPiece();
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function goHome() {
+            isGameRunning = false;
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('home-screen').classList.remove('hidden');
+        }
+
+        function triggerGameOver() {
+            isGameRunning = false;
+            playSound('gameover');
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('gameover-screen').classList.remove('hidden');
+        }
+
+        // --- 10. TOUCH, BUTTON & SWIPE EVENT LISTENERS (iOS & Android Friendly) ---
+        function bindHoldButton(btnId, actionFn, repeatDelay = 130) {
+            const btn = document.getElementById(btnId);
+            let holdInterval = null;
+            let holdTimeout = null;
+
+            const startAction = (e) => {
+                e.preventDefault();
+                initAudio();
+                btn.classList.add('pressed');
+                actionFn();
+                clearTimeout(holdTimeout);
+                clearInterval(holdInterval);
+                holdTimeout = setTimeout(() => {
+                    holdInterval = setInterval(actionFn, repeatDelay);
+                }, 220);
+            };
+
+            const stopAction = (e) => {
+                if (e) e.preventDefault();
+                btn.classList.remove('pressed');
+                clearTimeout(holdTimeout);
+                clearInterval(holdInterval);
+            };
+
+            btn.addEventListener('touchstart', startAction, { passive: false });
+            btn.addEventListener('touchend', stopAction);
+            btn.addEventListener('touchcancel', stopAction);
+            btn.addEventListener('mousedown', startAction);
+            btn.addEventListener('mouseup', stopAction);
+            btn.addEventListener('mouseleave', stopAction);
+        }
+
+        // Bind Big Bottom Buttons
+        bindHoldButton('ctrl-left', moveLeft, 120);
+        bindHoldButton('ctrl-right', moveRight, 120);
+        bindHoldButton('ctrl-fast', softDrop, 65);
+
+        // Rotate button (single tap per spin so toddlers don't accidentally over-spin)
+        const btnRotate = document.getElementById('ctrl-rotate');
+        const handleRotate = (e) => {
+            e.preventDefault();
+            initAudio();
+            btnRotate.classList.add('pressed');
+            rotatePiece();
+            setTimeout(() => btnRotate.classList.remove('pressed'), 120);
+        };
+        btnRotate.addEventListener('touchstart', handleRotate, { passive: false });
+        btnRotate.addEventListener('mousedown', handleRotate);
+
+        // Navigation & Screen Buttons
+        document.getElementById('btn-play').addEventListener('click', startGame);
+        document.getElementById('btn-play-again').addEventListener('click', startGame);
+        document.getElementById('btn-restart').addEventListener('click', startGame);
+        document.getElementById('btn-home').addEventListener('click', goHome);
+
+        // Speed Mode Toggle (Toddler vs Big Kid)
+        const modeToddler = document.getElementById('mode-toddler');
+        const modeKid = document.getElementById('mode-kid');
+        modeToddler.addEventListener('click', () => {
+            baseDropInterval = 1150;
+            modeToddler.classList.add('active');
+            modeKid.classList.remove('active');
+        });
+        modeKid.addEventListener('click', () => {
+            baseDropInterval = 700;
+            modeKid.classList.add('active');
+            modeToddler.classList.remove('active');
+        });
+
+        // Direct Canvas Touch Gestures (Tap canvas to Spin, Swipe Left/Right/Down to move)
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchMoved = false;
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            initAudio();
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            touchMoved = false;
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isGameRunning) return;
+            const touch = e.touches[0];
+            const dx = touch.clientX - touchStartX;
+            const dy = touch.clientY - touchStartY;
+            const stepThreshold = 28;
+
+            if (Math.abs(dx) > stepThreshold) {
+                if (dx > 0) moveRight();
+                else moveLeft();
+                touchStartX = touch.clientX;
+                touchMoved = true;
+            }
+            if (dy > stepThreshold) {
+                softDrop();
+                touchStartY = touch.clientY;
+                touchMoved = true;
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (!touchMoved && isGameRunning) {
+                rotatePiece(); // Tap on board rotates shark block
+            }
+        }, { passive: false });
+
+        // Keyboard Support (for iPad with keyboard or desktop testing)
+        window.addEventListener('keydown', (e) => {
+            if (!isGameRunning) return;
+            if (e.key === 'ArrowLeft') moveLeft();
+            else if (e.key === 'ArrowRight') moveRight();
+            else if (e.key === 'ArrowUp' || e.key === ' ') rotatePiece();
+            else if (e.key === 'ArrowDown') softDrop();
+        });
+
+        // Initial setup on window load
+        window.onload = () => {
+            resizeCanvas();
+        };
+    </script>
+</body>
+</html>
