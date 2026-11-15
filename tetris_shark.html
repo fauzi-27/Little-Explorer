@@ -129,29 +129,48 @@
 
         /* --- TOP NAVIGATION BAR --- */
         .top-bar {
-            display: flex;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
             align-items: center;
-            gap: 8px;
+            width: 100%;
+            margin: 0 auto;
             padding: 6px 0;
             flex-shrink: 0;
+        }
+
+        .top-bar > #btn-home {
+            justify-self: start;
+        }
+
+        .top-bar > .score-pill {
+            justify-self: center;
+        }
+
+        .top-actions {
+            justify-self: end;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .nav-btn {
             background: linear-gradient(180deg, #ffdf4d 0%, #ffb703 100%);
             border: 3px solid #ffffff;
-            border-radius: 20px;
-            padding: 8px 14px;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            padding: 0;
             color: #5c3a00;
             font-family: inherit;
             font-weight: 700;
             font-size: 1rem;
             display: flex;
             align-items: center;
-            gap: 6px;
-            box-shadow: 0 5px 0 #c98a00, 0 8px 15px rgba(0,0,0,0.25);
+            justify-content: center;
+            box-shadow: 0 4px 0 #c98a00, 0 6px 12px rgba(0,0,0,0.25);
             cursor: pointer;
             transition: transform 0.1s;
+            flex-shrink: 0;
         }
 
         .nav-btn:active {
@@ -162,7 +181,7 @@
         .nav-btn.pink-btn {
             background: linear-gradient(180deg, #ff85b3 0%, #ff4785 100%);
             color: #ffffff;
-            box-shadow: 0 5px 0 #b81d52, 0 8px 15px rgba(0,0,0,0.25);
+            box-shadow: 0 4px 0 #b81d52, 0 6px 12px rgba(0,0,0,0.25);
         }
         .nav-btn.pink-btn:active {
             box-shadow: 0 1px 0 #b81d52;
@@ -171,37 +190,33 @@
         .nav-btn.blue-btn {
             background: linear-gradient(180deg, #4cc9f0 0%, #0096c7 100%);
             color: #ffffff;
-            box-shadow: 0 5px 0 #005f80, 0 8px 15px rgba(0,0,0,0.25);
+            box-shadow: 0 4px 0 #005f80, 0 6px 12px rgba(0,0,0,0.25);
         }
         .nav-btn.blue-btn:active {
             box-shadow: 0 1px 0 #005f80;
-        }
-
-        .top-actions {
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
 
         .score-pill {
             background: rgba(255, 255, 255, 0.92);
             border: 3px solid #38bdf8;
             border-radius: 22px;
-            padding: 6px 16px;
+            padding: 5px 14px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: center;
+            gap: 6px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            min-width: 88px;
         }
 
         .score-label {
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             color: #0284c7;
             font-weight: 700;
         }
 
         .score-value {
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             color: #ff6b00;
             font-weight: 700;
         }
@@ -467,7 +482,8 @@
         @media (max-height: 640px) {
             .ctrl-btn { height: 56px; border-radius: 18px; }
             .ctrl-btn svg { width: 24px; height: 24px; }
-            .nav-btn { padding: 6px 10px; font-size: 0.9rem; }
+            .nav-btn { width: 38px; height: 38px; }
+            .score-pill { padding: 4px 10px; min-width: 76px; }
         }
     </style>
 </head>
@@ -521,35 +537,32 @@
 
     <!-- MAIN GAME UI -->
     <div id="app-container">
-        <!-- Top Bar: Home, Score, Restart -->
+        <!-- Top Bar: Home, Score, Pause, Restart -->
         <header class="top-bar">
             <button id="btn-home" class="nav-btn" aria-label="Home">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z"/>
                 </svg>
-                <span>Home</span>
             </button>
 
             <div class="score-pill">
-                <span class="score-label">STARS</span>
+                <span class="score-label">⭐</span>
                 <span id="score-display" class="score-value">0</span>
             </div>
 
             <div class="top-actions">
                 <button id="btn-pause" class="nav-btn blue-btn" aria-label="Pause">
-                    <svg id="pause-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                    <svg id="pause-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                         <rect x="6" y="4" width="4" height="16" rx="1.5"/>
                         <rect x="14" y="4" width="4" height="16" rx="1.5"/>
                     </svg>
-                    <span id="pause-label">Pause</span>
                 </button>
 
                 <button id="btn-restart" class="nav-btn pink-btn" aria-label="Restart">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                         <path d="M3 3v5h5"/>
                     </svg>
-                    <span>Restart</span>
                 </button>
             </div>
         </header>
@@ -846,6 +859,12 @@
             canvas.width = Math.floor(innerW * dpr);
             canvas.height = Math.floor(innerH * dpr);
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            // Match top-bar width exactly to the Tetris block screen frame
+            const topBar = document.querySelector('.top-bar');
+            if (topBar && rect.width > 0) {
+                topBar.style.width = `${rect.width}px`;
+            }
         }
         window.addEventListener('resize', resizeCanvas);
 
@@ -1282,16 +1301,13 @@
             if (!isGameRunning) return;
             isPaused = paused;
             const pauseScreen = document.getElementById('pause-screen');
-            const pauseLabel = document.getElementById('pause-label');
             const pauseIcon = document.getElementById('pause-icon');
 
             if (isPaused) {
                 pauseScreen.classList.remove('hidden');
-                pauseLabel.textContent = 'Play';
                 pauseIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
             } else {
                 pauseScreen.classList.add('hidden');
-                pauseLabel.textContent = 'Pause';
                 pauseIcon.innerHTML = '<rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/>';
                 lastTime = performance.now();
             }
