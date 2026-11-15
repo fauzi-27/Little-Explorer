@@ -7,10 +7,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <title>Tetris Shark</title>
-    <!-- Load Fredoka font for a bubbly, kid-friendly look -->
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
-    <!-- Load Tone.js for cheerful underwater sound effects without external audio files -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
         :root {
             --ocean-top: #00d2ff;
@@ -35,7 +31,8 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            font-family: 'Fredoka', cursive, sans-serif;
+            /* Offline-safe rounded font stack for iOS (SF Pro Rounded), Android, and Desktop */
+            font-family: 'SF Pro Rounded', 'Nunito', 'Quicksand', 'Comic Sans MS', ui-rounded, system-ui, -apple-system, sans-serif;
             background: linear-gradient(180deg, var(--ocean-top) 0%, var(--ocean-mid) 60%, var(--ocean-bottom) 100%);
             display: flex;
             flex-direction: column;
@@ -169,6 +166,21 @@
         }
         .nav-btn.pink-btn:active {
             box-shadow: 0 1px 0 #b81d52;
+        }
+
+        .nav-btn.blue-btn {
+            background: linear-gradient(180deg, #4cc9f0 0%, #0096c7 100%);
+            color: #ffffff;
+            box-shadow: 0 5px 0 #005f80, 0 8px 15px rgba(0,0,0,0.25);
+        }
+        .nav-btn.blue-btn:active {
+            box-shadow: 0 1px 0 #005f80;
+        }
+
+        .top-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .score-pill {
@@ -523,13 +535,23 @@
                 <span id="score-display" class="score-value">0</span>
             </div>
 
-            <button id="btn-restart" class="nav-btn pink-btn" aria-label="Restart">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                    <path d="M3 3v5h5"/>
-                </svg>
-                <span>Restart</span>
-            </button>
+            <div class="top-actions">
+                <button id="btn-pause" class="nav-btn blue-btn" aria-label="Pause">
+                    <svg id="pause-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="4" width="4" height="16" rx="1.5"/>
+                        <rect x="14" y="4" width="4" height="16" rx="1.5"/>
+                    </svg>
+                    <span id="pause-label">Pause</span>
+                </button>
+
+                <button id="btn-restart" class="nav-btn pink-btn" aria-label="Restart">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                        <path d="M3 3v5h5"/>
+                    </svg>
+                    <span>Restart</span>
+                </button>
+            </div>
         </header>
 
         <!-- Center Game Canvas -->
@@ -634,6 +656,26 @@
         </div>
     </div>
 
+    <!-- PAUSE SCREEN OVERLAY -->
+    <div id="pause-screen" class="overlay-screen hidden">
+        <div class="card-box">
+            <h2 class="game-title" style="font-size: 2.3rem;">PAUSED</h2>
+            <p style="font-size: 1.15rem; color: #0284c7; font-weight: 700;">Take a little shark break!</p>
+            <button id="btn-resume" class="big-play-btn">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z"/>
+                </svg>
+                <span>RESUME</span>
+            </button>
+            <button id="btn-pause-home" class="nav-btn" style="margin-top: 4px; padding: 10px 24px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z"/>
+                </svg>
+                <span>Home</span>
+            </button>
+        </div>
+    </div>
+
     <script>
         /**
          * TETRIS SHARK - Game Engine & Toddler UI Logic
@@ -665,49 +707,91 @@
         setInterval(spawnBubble, 450);
         for (let i = 0; i < 10; i++) setTimeout(spawnBubble, i * 250);
 
-        // --- 2. SOUND EFFECTS ENGINE (Tone.js - No external files needed) ---
-        let synth = null;
-        let audioReady = false;
+        // --- 2. 100% OFFLINE & iOS-SAFE SOUND EFFECTS ENGINE (Native Web Audio API) ---
+        let audioCtx = null;
 
-        async function initAudio() {
-            if (audioReady) return;
+        function initAudio() {
             try {
-                await Tone.start();
-                synth = new Tone.PolySynth(Tone.Synth, {
-                    oscillator: { type: "triangle" },
-                    envelope: { attack: 0.02, decay: 0.15, sustain: 0.1, release: 0.4 }
-                }).toDestination();
-                synth.volume.value = -6;
-                audioReady = true;
+                if (!audioCtx) {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContextClass) {
+                        audioCtx = new AudioContextClass();
+                    }
+                }
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                // Play a tiny silent buffer to force-unlock iOS Safari audio hardware on tap
+                if (audioCtx) {
+                    const buffer = audioCtx.createBuffer(1, 1, 22050);
+                    const source = audioCtx.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(audioCtx.destination);
+                    source.start(0);
+                }
             } catch (e) {
                 console.warn("Audio init skipped:", e);
             }
         }
 
+        // Helper to play a cheerful musical note using native Web Audio
+        function playTone(freq, startTime, duration, type = 'triangle', volume = 0.25) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, startTime);
+
+            // Smooth attack and decay envelope so it sounds soft and bubbly
+            gain.gain.setValueAtTime(0.001, startTime);
+            gain.gain.linearRampToValueAtTime(volume, startTime + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start(startTime);
+            osc.stop(startTime + duration + 0.02);
+        }
+
         function playSound(type) {
-            if (!audioReady || !synth) return;
-            const now = Tone.now();
+            if (!audioCtx) initAudio();
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const now = audioCtx.currentTime;
             try {
                 if (type === 'move') {
-                    synth.triggerAttackRelease("C5", "32n", now);
+                    playTone(523.25, now, 0.08, 'triangle', 0.2); // C5
                 } else if (type === 'rotate') {
-                    synth.triggerAttackRelease(["E5", "G5"], "32n", now);
+                    playTone(659.25, now, 0.09, 'triangle', 0.22); // E5
+                    playTone(783.99, now + 0.04, 0.1, 'triangle', 0.22); // G5
                 } else if (type === 'drop') {
-                    synth.triggerAttackRelease("G3", "16n", now);
+                    playTone(196.00, now, 0.12, 'sine', 0.3); // G3 soft thump
                 } else if (type === 'clear') {
-                    // Cheerful "Baby Shark" style arpeggio fanfare!
-                    synth.triggerAttackRelease("D5", "16n", now);
-                    synth.triggerAttackRelease("E5", "16n", now + 0.12);
-                    synth.triggerAttackRelease("G5", "8n", now + 0.24);
-                    synth.triggerAttackRelease("G5", "8n", now + 0.40);
-                    synth.triggerAttackRelease(["G5", "B5", "D6"], "4n", now + 0.56);
+                    // Cheerful "Baby Shark" style arpeggio fanfare! (D5 - E5 - G5 - G5 - Chord)
+                    playTone(587.33, now, 0.14, 'triangle', 0.28);        // D5
+                    playTone(659.25, now + 0.12, 0.14, 'triangle', 0.28); // E5
+                    playTone(783.99, now + 0.24, 0.16, 'triangle', 0.3);  // G5
+                    playTone(783.99, now + 0.40, 0.16, 'triangle', 0.3);  // G5
+                    // Celebratory final chord (G5 + B5 + D6)
+                    playTone(783.99, now + 0.56, 0.45, 'triangle', 0.25); // G5
+                    playTone(987.77, now + 0.56, 0.45, 'triangle', 0.22); // B5
+                    playTone(1174.66, now + 0.56, 0.45, 'triangle', 0.22);// D6
                 } else if (type === 'gameover') {
-                    synth.triggerAttackRelease("G4", "8n", now);
-                    synth.triggerAttackRelease("E4", "8n", now + 0.18);
-                    synth.triggerAttackRelease("C4", "4n", now + 0.36);
+                    playTone(392.00, now, 0.2, 'triangle', 0.25);        // G4
+                    playTone(329.63, now + 0.18, 0.2, 'triangle', 0.25); // E4
+                    playTone(261.63, now + 0.36, 0.4, 'triangle', 0.25); // C4
                 }
             } catch (e) {}
         }
+
+        // Unlock audio on any first touch anywhere on the screen for iOS Safari
+        document.addEventListener('touchstart', initAudio, { once: true, passive: true });
+        document.addEventListener('click', initAudio, { once: true });
 
         // --- 3. SHARK BLOCK COLORS (STRICTLY ORANGE, PINK, BLUE, YELLOW, GREEN) ---
         const SHARK_PALETTE = {
@@ -1155,40 +1239,76 @@
                         if (currentPiece.matrix[r][c]) {
                             // Draw helpful ghost shadow
                             drawSharkBlock(ctx, currentPiece.x + c, ghostY + r, cellSize, currentPiece.colorKey, true);
-                            // Draw active shark block
+                            // Draw active falling shark block
                             drawSharkBlock(ctx, currentPiece.x + c, currentPiece.y + r, cellSize, currentPiece.colorKey, false);
                         }
                     }
                 }
             }
 
-            // Draw Row Clear Dramatic Particles
+            // Draw dramatic row clear flash and particles
             updateAndDrawParticles(ctx, cellSize);
         }
 
         function gameLoop(time = 0) {
             if (!isGameRunning) return;
 
-            const deltaTime = time - lastTime;
-            lastTime = time;
-
             if (!isPaused) {
+                const deltaTime = time - lastTime;
+                lastTime = time;
+
                 dropCounter += deltaTime;
-                if (dropCounter > baseDropInterval) {
-                    softDrop();
+                // Gentle speed progression as score increases
+                const currentInterval = Math.max(320, baseDropInterval - Math.floor(score / 500) * 60);
+
+                if (dropCounter > currentInterval) {
+                    if (!checkCollision(board, currentPiece, 0, 1)) {
+                        currentPiece.y++;
+                    } else {
+                        lockPiece();
+                    }
                     dropCounter = 0;
                 }
+            } else {
+                lastTime = time;
             }
 
             draw();
             animationFrameId = requestAnimationFrame(gameLoop);
         }
 
-        // --- 9. GAME STATE CONTROLS (START, RESTART, HOME, GAME OVER) ---
+        // --- 9. GAME STATE CONTROLS (START, RESTART, HOME, PAUSE, GAME OVER) ---
+        function setPausedState(paused) {
+            if (!isGameRunning) return;
+            isPaused = paused;
+            const pauseScreen = document.getElementById('pause-screen');
+            const pauseLabel = document.getElementById('pause-label');
+            const pauseIcon = document.getElementById('pause-icon');
+
+            if (isPaused) {
+                pauseScreen.classList.remove('hidden');
+                pauseLabel.textContent = 'Play';
+                pauseIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+            } else {
+                pauseScreen.classList.add('hidden');
+                pauseLabel.textContent = 'Pause';
+                pauseIcon.innerHTML = '<rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/>';
+                lastTime = performance.now();
+            }
+        }
+
+        function togglePause() {
+            if (!isGameRunning) return;
+            initAudio();
+            playSound('move');
+            setPausedState(!isPaused);
+        }
+
         function startGame() {
             initAudio();
             document.getElementById('home-screen').classList.add('hidden');
             document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('pause-screen').classList.add('hidden');
 
             resizeCanvas();
             board = createEmptyBoard();
@@ -1198,7 +1318,7 @@
             document.getElementById('score-display').textContent = '0';
 
             isGameRunning = true;
-            isPaused = false;
+            setPausedState(false);
             dropCounter = 0;
             lastTime = performance.now();
 
@@ -1209,8 +1329,10 @@
 
         function goHome() {
             isGameRunning = false;
+            isPaused = false;
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('pause-screen').classList.add('hidden');
             document.getElementById('home-screen').classList.remove('hidden');
         }
 
@@ -1276,6 +1398,9 @@
         document.getElementById('btn-play-again').addEventListener('click', startGame);
         document.getElementById('btn-restart').addEventListener('click', startGame);
         document.getElementById('btn-home').addEventListener('click', goHome);
+        document.getElementById('btn-pause').addEventListener('click', togglePause);
+        document.getElementById('btn-resume').addEventListener('click', () => setPausedState(false));
+        document.getElementById('btn-pause-home').addEventListener('click', goHome);
 
         // Speed Mode Toggle (Toddler vs Big Kid)
         const modeToddler = document.getElementById('mode-toddler');
@@ -1307,7 +1432,7 @@
 
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
-            if (!isGameRunning) return;
+            if (!isGameRunning || isPaused) return;
             const touch = e.touches[0];
             const dx = touch.clientX - touchStartX;
             const dy = touch.clientY - touchStartY;
@@ -1328,7 +1453,7 @@
 
         canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
-            if (!touchMoved && isGameRunning) {
+            if (!touchMoved && isGameRunning && !isPaused) {
                 rotatePiece(); // Tap on board rotates shark block
             }
         }, { passive: false });
@@ -1336,6 +1461,11 @@
         // Keyboard Support (for iPad with keyboard or desktop testing)
         window.addEventListener('keydown', (e) => {
             if (!isGameRunning) return;
+            if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+                togglePause();
+                return;
+            }
+            if (isPaused) return;
             if (e.key === 'ArrowLeft') moveLeft();
             else if (e.key === 'ArrowRight') moveRight();
             else if (e.key === 'ArrowUp' || e.key === ' ') rotatePiece();
