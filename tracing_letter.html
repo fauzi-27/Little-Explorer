@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Prevent pinch zooming and ensure responsive scaling across iPhone, iPad, Android tablets & phones -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>ABC Letter Tracing</title>
+    <style>
+        :root {
+            --sky-top: #7dd3fc;
+            --sky-mid: #bae6fd;
+            --grass-light: #86efac;
+            --grass-dark: #4ade80;
+            --card-bg: #ffffff;
+            --primary-orange: #ff8c00;
+            --primary-pink: #ff4785;
+            --primary-blue: #0096c7;
+            --primary-green: #1db934;
+            --primary-yellow: #ffde00;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: none; /* Prevents scrolling while finger-tracing on touchscreens */
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            /* 100% Offline-safe rounded font stack for toddlers */
+            font-family: 'SF Pro Rounded', 'Nunito', 'Quicksand', 'Comic Sans MS', ui-rounded, system-ui, -apple-system, sans-serif;
+            background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 70%, var(--grass-light) 70%, var(--grass-dark) 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* --- CHEERFUL OFFLINE BACKGROUND DECORATIONS --- */
+        #bg-decor {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .sun {
+            position: absolute;
+            top: -30px;
+            right: -30px;
+            width: 130px;
+            height: 130px;
+            background: radial-gradient(circle, #fff380 20%, #ffde00 70%, rgba(255, 222, 0, 0) 100%);
+            border-radius: 50%;
+            animation: pulseSun 4s ease-in-out infinite;
+        }
+
+        @keyframes pulseSun {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        .cloud {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 50px;
+            animation: floatCloud linear infinite;
+        }
+        .cloud::before, .cloud::after {
+            content: '';
+            position: absolute;
+            background: inherit;
+            border-radius: 50%;
+        }
+        .cloud-1 {
+            width: 120px;
+            height: 40px;
+            top: 8%;
+            left: -140px;
+            animation-duration: 38s;
+        }
+        .cloud-1::before { width: 55px; height: 55px; top: -25px; left: 18px; }
+        .cloud-1::after { width: 42px; height: 42px; top: -16px; right: 18px; }
+
+        .cloud-2 {
+            width: 95px;
+            height: 32px;
+            top: 18%;
+            left: -120px;
+            animation-duration: 50s;
+            animation-delay: 12s;
+        }
+        .cloud-2::before { width: 42px; height: 42px; top: -20px; left: 14px; }
+        .cloud-2::after { width: 32px; height: 32px; top: -12px; right: 14px; }
+
+        @keyframes floatCloud {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(calc(100vw + 260px)); }
+        }
+
+        /* --- MAIN APP LAYOUT --- */
+        #app-wrapper {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 780px;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: env(safe-area-inset-top, 12px) 14px env(safe-area-inset-bottom, 14px) 14px;
+        }
+
+        /* --- TOP HEADER BAR --- */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            padding: 4px 0;
+            flex-shrink: 0;
+            gap: 8px;
+        }
+
+        .pill-badge {
+            background: #ffffff;
+            border: 4px solid #ffde00;
+            border-radius: 26px;
+            padding: 6px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 5px 0 #e0b000, 0 8px 15px rgba(0, 0, 0, 0.12);
+            font-weight: 800;
+            font-size: 1.2rem;
+            color: #ff6b00;
+        }
+
+        .letter-title-pill {
+            background: #ffffff;
+            border: 4px solid #38bdf8;
+            border-radius: 26px;
+            padding: 6px 20px;
+            box-shadow: 0 5px 0 #0284c7, 0 8px 15px rgba(0, 0, 0, 0.12);
+            font-weight: 800;
+            font-size: 1.35rem;
+            color: #0369a1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .letter-title-pill:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #0284c7;
+        }
+
+        .icon-circle-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 4px solid #ffffff;
+            background: linear-gradient(180deg, #ff85b3 0%, #ff4785 100%);
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 5px 0 #b81d52, 0 8px 14px rgba(0, 0, 0, 0.18);
+            cursor: pointer;
+            transition: transform 0.1s;
+            flex-shrink: 0;
+        }
+        .icon-circle-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #b81d52;
+        }
+
+        /* --- ENCOURAGEMENT MESSAGE BANNER --- */
+        .message-bar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 48px;
+            margin: 4px 0;
+            flex-shrink: 0;
+        }
+
+        #encouragement-pill {
+            background: linear-gradient(180deg, #fff9db 0%, #ffffff 100%);
+            border: 4px solid #ff9f1c;
+            border-radius: 30px;
+            padding: 8px 24px;
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #d95300;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            text-align: center;
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s, border-color 0.3s;
+        }
+
+        #encouragement-pill.celebrate {
+            background: linear-gradient(180deg, #ffde00 0%, #ffb703 100%);
+            border-color: #ffffff;
+            color: #5c3a00;
+            transform: scale(1.1);
+        }
+
+        /* --- CENTER STAGE: LEFT ARROW + TRACING BOARD + RIGHT ARROW --- */
+        .stage-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+            min-height: 0;
+            padding: 4px 0;
+        }
+
+        /* Big Left & Right Arrow Buttons */
+        .nav-arrow-btn {
+            width: 64px;
+            height: 92px;
+            border-radius: 28px;
+            border: 5px solid #ffffff;
+            background: linear-gradient(180deg, #4cc9f0 0%, #0096c7 100%);
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 7px 0 #005f80, 0 10px 20px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: transform 0.1s;
+        }
+        .nav-arrow-btn:active {
+            transform: translateY(5px) scale(0.96);
+            box-shadow: 0 2px 0 #005f80;
+        }
+        .nav-arrow-btn svg {
+            width: 38px;
+            height: 38px;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
+        }
+
+        /* Tracing Card Frame */
+        .tracing-card {
+            position: relative;
+            flex: 1;
+            max-width: 460px;
+            height: 100%;
+            max-height: 480px;
+            background: #ffffff;
+            border: 7px solid #ffde00;
+            border-radius: 36px;
+            box-shadow: 0 12px 0 #e0b000, 0 18px 35px rgba(0, 0, 0, 0.22);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Subtle notebook ruled lines inside the card */
+        .tracing-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(to bottom, transparent 24%, rgba(56, 189, 248, 0.22) 25%, transparent 26%),
+                linear-gradient(to bottom, transparent 49%, rgba(255, 112, 166, 0.25) 50%, transparent 51%),
+                linear-gradient(to bottom, transparent 74%, rgba(56, 189, 248, 0.22) 75%, transparent 76%);
+            pointer-events: none;
+        }
+
+        canvas#trace-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: pointer;
+            touch-action: none;
+        }
+
+        /* --- STAR REWARD OVERLAY INSIDE CARD --- */
+        #star-celebration-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        #star-celebration-overlay.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .big-reward-star {
+            width: 150px;
+            height: 150px;
+            filter: drop-shadow(0 8px 16px rgba(255, 140, 0, 0.45));
+            animation: spinBounceStar 1.2s ease-in-out infinite;
+        }
+
+        @keyframes spinBounceStar {
+            0%, 100% { transform: scale(1) rotate(-6deg); }
+            50% { transform: scale(1.14) rotate(6deg); }
+        }
+
+        /* --- BOTTOM QUICK ALPHABET BAR (OPTIONAL TAP TO JUMP OR RESET) --- */
+        .bottom-bar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding-top: 6px;
+            flex-shrink: 0;
+        }
+
+        .action-pill-btn {
+            background: linear-gradient(180deg, #52e365 0%, #1db934 100%);
+            border: 4px solid #ffffff;
+            border-radius: 26px;
+            padding: 10px 24px;
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 1.15rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 5px 0 #0e701c, 0 8px 16px rgba(0, 0, 0, 0.18);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .action-pill-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #0e701c;
+        }
+
+        /* --- RESPONSIVE MOBILE & TABLET TWEAKS --- */
+        @media (max-width: 520px) {
+            .nav-arrow-btn {
+                width: 50px;
+                height: 78px;
+                border-radius: 22px;
+                border-width: 4px;
+            }
+            .nav-arrow-btn svg {
+                width: 30px;
+                height: 30px;
+            }
+            .stage-container {
+                gap: 8px;
+            }
+            #encouragement-pill {
+                font-size: 1.15rem;
+                padding: 6px 16px;
+            }
+            .letter-title-pill {
+                font-size: 1.15rem;
+                padding: 6px 14px;
+            }
+            .pill-badge {
+                font-size: 1.05rem;
+                padding: 6px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- OFFLINE BACKGROUND SCENE -->
+    <div id="bg-decor">
+        <div class="sun"></div>
+        <div class="cloud cloud-1"></div>
+        <div class="cloud cloud-2"></div>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div id="app-wrapper">
+        <!-- TOP BAR: STAR SCORE, CURRENT LETTER & SOUND BUTTON -->
+        <header class="top-bar">
+            <div class="pill-badge" aria-label="Stars Earned">
+                <span>⭐</span>
+                <span id="star-count">0</span>
+            </div>
+
+            <button id="btn-speak-letter" class="letter-title-pill" aria-label="Hear Letter Sound">
+                <span id="header-letter-label">Letter A</span>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                </svg>
+            </button>
+
+            <button id="btn-reset" class="icon-circle-btn" aria-label="Trace Again">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                    <path d="M3 3v5h5"/>
+                </svg>
+            </button>
+        </header>
+
+        <!-- ENCOURAGEMENT MESSAGE BANNER -->
+        <div class="message-bar">
+            <div id="encouragement-pill">Trace the letter A!</div>
+        </div>
+
+        <!-- MAIN INTERACTIVE STAGE: LEFT ARROW | TRACING BOARD | RIGHT ARROW -->
+        <main class="stage-container">
+            <!-- BACK BUTTON (LEFT ARROW ICON) -->
+            <button id="btn-prev" class="nav-arrow-btn" aria-label="Previous Letter">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 18l-6-6 6-6"/>
+                </svg>
+            </button>
+
+            <!-- TRACING CANVAS CARD -->
+            <div class="tracing-card" id="tracing-card">
+                <canvas id="trace-canvas"></canvas>
+
+                <!-- BIG CELEBRATION STAR OVERLAY -->
+                <div id="star-celebration-overlay">
+                    <svg class="big-reward-star" viewBox="0 0 100 100">
+                        <polygon points="50,5 63,35 95,38 71,59 78,91 50,74 22,91 29,59 5,38 37,35"
+                                 fill="#FFDE00" stroke="#FF8C00" stroke-width="5" stroke-linejoin="round"/>
+                        <!-- Cute Happy Eyes on the Star -->
+                        <circle cx="41" cy="48" r="4" fill="#333"/>
+                        <circle cx="59" cy="48" r="4" fill="#333"/>
+                        <circle cx="42.5" cy="46.5" r="1.5" fill="#FFF"/>
+                        <circle cx="60.5" cy="46.5" r="1.5" fill="#FFF"/>
+                        <path d="M43,58 Q50,65 57,58" stroke="#333" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- NEXT BUTTON (RIGHT ARROW ICON) -->
+            <button id="btn-next" class="nav-arrow-btn" aria-label="Next Letter">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18l6-6-6-6"/>
+                </svg>
+            </button>
+        </main>
+
+        <!-- BOTTOM ACTION BAR -->
+        <footer class="bottom-bar">
+            <button id="btn-next-bottom" class="action-pill-btn hidden">
+                <span>Next Letter</span>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14M13 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </footer>
+    </div>
+
+    <script>
+        /**
+         * ABC CAPITAL LETTER TRACING GAME (100% OFFLINE & TODDLER-FRIENDLY)
+         * - Thick, wide, rounded strokes for easy finger & mouse tracing
+         * - Stroke-by-stroke guided dots with animated guiding hand/sparkle
+         * - Live encouraging messages ("You can do it!", "Keep going!", "Great job!")
+         * - Offline Web Audio chimes + offline SpeechSynthesis voice encouragement
+         * - Exploding star particles + Big Happy Star reward on completion
+         */
+
+        // --- 1. CAPITAL LETTERS STROKE DEFINITIONS (Normalized 0.0 to 1.0 coordinates) ---
+        // Designed with clean, toddler-friendly proportions and standard handwriting stroke order
+        const LETTERS = [
+            {
+                char: 'A',
+                word: 'Apple',
+                color: '#FF595E',
+                strokes: [
+                    [[0.50, 0.16], [0.22, 0.84]],
+                    [[0.50, 0.16], [0.78, 0.84]],
+                    [[0.32, 0.58], [0.68, 0.58]]
+                ]
+            },
+            {
+                char: 'B',
+                word: 'Bear',
+                color: '#FF924C',
+                strokes: [
+                    [[0.30, 0.16], [0.30, 0.84]],
+                    [[0.30, 0.16], [0.58, 0.16], [0.70, 0.25], [0.70, 0.39], [0.58, 0.48], [0.30, 0.48]],
+                    [[0.30, 0.48], [0.62, 0.48], [0.74, 0.58], [0.74, 0.74], [0.62, 0.84], [0.30, 0.84]]
+                ]
+            },
+            {
+                char: 'C',
+                word: 'Cat',
+                color: '#FFCA3A',
+                strokes: [
+                    [[0.74, 0.28], [0.60, 0.16], [0.40, 0.16], [0.26, 0.30], [0.24, 0.50], [0.26, 0.70], [0.40, 0.84], [0.60, 0.84], [0.74, 0.72]]
+                ]
+            },
+            {
+                char: 'D',
+                word: 'Dog',
+                color: '#8AC926',
+                strokes: [
+                    [[0.28, 0.16], [0.28, 0.84]],
+                    [[0.28, 0.16], [0.54, 0.16], [0.74, 0.32], [0.76, 0.50], [0.74, 0.68], [0.54, 0.84], [0.28, 0.84]]
+                ]
+            },
+            {
+                char: 'E',
+                word: 'Elephant',
+                color: '#1982C4',
+                strokes: [
+                    [[0.30, 0.16], [0.30, 0.84]],
+                    [[0.30, 0.16], [0.72, 0.16]],
+                    [[0.30, 0.50], [0.64, 0.50]],
+                    [[0.30, 0.84], [0.72, 0.84]]
+                ]
+            },
+            {
+                char: 'F',
+                word: 'Fish',
+                color: '#6A4C93',
+                strokes: [
+                    [[0.32, 0.16], [0.32, 0.84]],
+                    [[0.32, 0.16], [0.74, 0.16]],
+                    [[0.32, 0.50], [0.66, 0.50]]
+                ]
+            },
+            {
+                char: 'G',
+                word: 'Giraffe',
+                color: '#FF595E',
+                strokes: [
+                    [[0.74, 0.28], [0.60, 0.16], [0.40, 0.16], [0.26, 0.30], [0.24, 0.50], [0.26, 0.70], [0.40, 0.84], [0.62, 0.84], [0.75, 0.70], [0.75, 0.52], [0.54, 0.52]]
+                ]
+            },
+            {
+                char: 'H',
+                word: 'Hippo',
+                color: '#FF924C',
+                strokes: [
+                    [[0.28, 0.16], [0.28, 0.84]],
+                    [[0.72, 0.16], [0.72, 0.84]],
+                    [[0.28, 0.50], [0.72, 0.50]]
+                ]
+            },
+            {
+                char: 'I',
+                word: 'Igloo',
+                color: '#1982C4',
+                strokes: [
+                    [[0.50, 0.16], [0.50, 0.84]],
+                    [[0.32, 0.16], [0.68, 0.16]],
+                    [[0.32, 0.84], [0.68, 0.84]]
+                ]
+            },
+            {
+                char: 'J',
+                word: 'Jellyfish',
+                color: '#8AC926',
+                strokes: [
+                    [[0.62, 0.16], [0.62, 0.66], [0.56, 0.80], [0.42, 0.84], [0.28, 0.76], [0.26, 0.64]],
+                    [[0.38, 0.16], [0.76, 0.16]]
+                ]
+            },
+            {
+                char: 'K',
+                word: 'Kangaroo',
+                color: '#6A4C93',
+                strokes: [
+                    [[0.30, 0.16], [0.30, 0.84]],
+                    [[0.72, 0.16], [0.32, 0.52]],
+                    [[0.42, 0.44], [0.74, 0.84]]
+                ]
+            },
+            {
+                char: 'L',
+                word: 'Lion',
+                color: '#FF595E',
+                strokes: [
+                    [[0.30, 0.16], [0.30, 0.84]],
+                    [[0.30, 0.84], [0.74, 0.84]]
+                ]
+            },
+            {
+                char: 'M',
+                word: 'Monkey',
+                color: '#FF924C',
+                strokes: [
+                    [[0.22, 0.84], [0.22, 0.16]],
+                    [[0.22, 0.16], [0.50, 0.58]],
+                    [[0.78, 0.16], [0.50, 0.58]],
+                    [[0.78, 0.16], [0.78, 0.84]]
+                ]
+            },
+            {
+                char: 'N',
+                word: 'Nest',
+                color: '#8AC926',
+                strokes: [
+                    [[0.26, 0.84], [0.26, 0.16]],
+                    [[0.26, 0.16], [0.74, 0.84]],
+                    [[0.74, 0.84], [0.74, 0.16]]
+                ]
+            },
+            {
+                char: 'O',
+                word: 'Octopus',
+                color: '#1982C4',
+                strokes: [
+                    [[0.50, 0.16], [0.30, 0.24], [0.22, 0.50], [0.30, 0.76], [0.50, 0.84], [0.70, 0.76], [0.78, 0.50], [0.70, 0.24], [0.50, 0.16]]
+                ]
+            },
+            {
+                char: 'P',
+                word: 'Panda',
+                color: '#6A4C93',
+                strokes: [
+                    [[0.30, 0.16], [0.30, 0.84]],
+                    [[0.30, 0.16], [0.60, 0.16], [0.74, 0.26], [0.74, 0.42], [0.60, 0.52], [0.30, 0.52]]
+                ]
+            },
+            {
+                char: 'Q',
+                word: 'Queen',
+                color: '#FF595E',
+                strokes: [
+                    [[0.50, 0.16], [0.30, 0.24], [0.22, 0.50], [0.30, 0.76], [0.50, 0.84], [0.70, 0.76], [0.78, 0.50], [0.70, 0.24], [0.50, 0.16]],
+                    [[0.56, 0.66], [0.80, 0.86]]
+                ]
+            },
+            {
+                char: 'R',
+                word: 'Rabbit',
+                color: '#FF924C',
+                strokes: [
+                    [[0.30, 0.16], [0.30, 0.84]],
+                    [[0.30, 0.16], [0.60, 0.16], [0.74, 0.26], [0.74, 0.40], [0.60, 0.50], [0.30, 0.50]],
+                    [[0.50, 0.50], [0.76, 0.84]]
+                ]
+            },
+            {
+                char: 'S',
+                word: 'Star',
+                color: '#8AC926',
+                strokes: [
+                    [[0.70, 0.24], [0.56, 0.16], [0.38, 0.16], [0.28, 0.28], [0.32, 0.42], [0.68, 0.56], [0.72, 0.72], [0.58, 0.84], [0.38, 0.84], [0.26, 0.74]]
+                ]
+            },
+            {
+                char: 'T',
+                word: 'Tiger',
+                color: '#1982C4',
+                strokes: [
+                    [[0.22, 0.16], [0.78, 0.16]],
+                    [[0.50, 0.16], [0.50, 0.84]]
+                ]
+            },
+            {
+                char: 'U',
+                word: 'Umbrella',
+                color: '#6A4C93',
+                strokes: [
+                    [[0.26, 0.16], [0.26, 0.62], [0.34, 0.78], [0.50, 0.84], [0.66, 0.78], [0.74, 0.62], [0.74, 0.16]]
+                ]
+            },
+            {
+                char: 'V',
+                word: 'Violin',
+                color: '#FF595E',
+                strokes: [
+                    [[0.24, 0.16], [0.50, 0.84]],
+                    [[0.76, 0.16], [0.50, 0.84]]
+                ]
+            },
+            {
+                char: 'W',
+                word: 'Whale',
+                color: '#1982C4',
+                strokes: [
+                    [[0.18, 0.16], [0.34, 0.84]],
+                    [[0.50, 0.42], [0.34, 0.84]],
+                    [[0.50, 0.42], [0.66, 0.84]],
+                    [[0.82, 0.16], [0.66, 0.84]]
+                ]
+            },
+            {
+                char: 'X',
+                word: 'Xylophone',
+                color: '#FF924C',
+                strokes: [
+                    [[0.24, 0.16], [0.76, 0.84]],
+                    [[0.76, 0.16], [0.24, 0.84]]
+                ]
+            },
+            {
+                char: 'Y',
+                word: 'Yo-yo',
+                color: '#8AC926',
+                strokes: [
+                    [[0.24, 0.16], [0.50, 0.50]],
+                    [[0.76, 0.16], [0.50, 0.50]],
+                    [[0.50, 0.50], [0.50, 0.84]]
+                ]
+            },
+            {
+                char: 'Z',
+                word: 'Zebra',
+                color: '#6A4C93',
+                strokes: [
+                    [[0.24, 0.16], [0.76, 0.16]],
+                    [[0.76, 0.16], [0.24, 0.84]],
+                    [[0.24, 0.84], [0.76, 0.84]]
+                ]
+            }
+        ];
+
+        // --- 2. 100% OFFLINE AUDIO & VOICE ENCOURAGEMENT ENGINE ---
+        let audioCtx = null;
+        let lastSpokenTime = 0;
+        let preferredCheerfulVoice = null;
+
+        // Pick the brightest, warmest, friendliest offline voice available on the device
+        function loadCheerfulVoice() {
+            if (!('speechSynthesis' in window)) return;
+            const voices = window.speechSynthesis.getVoices();
+            if (!voices || voices.length === 0) return;
+
+            const englishVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('en'));
+            const pool = englishVoices.length > 0 ? englishVoices : voices;
+
+            // Prioritize warm, expressive, kid-friendly voices on iOS, Android, Windows & macOS
+            const preferredNames = [
+                'samantha', 'karen', 'moira', 'tessa', 'fiona', // iOS / macOS warm expressive voices
+                'zira', 'aria', 'jenny', 'ana',                 // Windows cheerful voices
+                'google us english', 'google uk english female',
+                'female', 'woman', 'child', 'kid'
+            ];
+
+            for (const name of preferredNames) {
+                const match = pool.find(v => v.name.toLowerCase().includes(name));
+                if (match) {
+                    preferredCheerfulVoice = match;
+                    return;
+                }
+            }
+            preferredCheerfulVoice = pool[0];
+        }
+
+        if ('speechSynthesis' in window) {
+            loadCheerfulVoice();
+            window.speechSynthesis.onvoiceschanged = loadCheerfulVoice;
+        }
+
+        function initAudio() {
+            try {
+                if (!audioCtx) {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContextClass) audioCtx = new AudioContextClass();
+                }
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            } catch (e) {}
+        }
+
+        function playChime(freq, startTime, duration, volume = 0.22) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, startTime);
+
+            gain.gain.setValueAtTime(0.001, startTime);
+            gain.gain.linearRampToValueAtTime(volume, startTime + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(startTime);
+            osc.stop(startTime + duration + 0.02);
+        }
+
+        function playSoundEffect(type) {
+            initAudio();
+            if (!audioCtx) return;
+            const now = audioCtx.currentTime;
+
+            if (type === 'dot') {
+                // Soft bubbly pop as finger traces along checkpoints
+                const pitch = 520 + (currentWaypointIdx * 18);
+                playChime(Math.min(pitch, 1050), now, 0.09, 0.14);
+            } else if (type === 'strokeComplete') {
+                playChime(587.33, now, 0.15, 0.22);        // D5
+                playChime(880.00, now + 0.09, 0.22, 0.24); // A5
+            } else if (type === 'letterComplete') {
+                // Cheerful celebratory harp/chime fanfare
+                playChime(523.25, now, 0.18, 0.26);        // C5
+                playChime(659.25, now + 0.11, 0.18, 0.26); // E5
+                playChime(783.99, now + 0.22, 0.18, 0.26); // G5
+                playChime(1046.50, now + 0.34, 0.45, 0.3); // C6
+            } else if (type === 'nav') {
+                playChime(659.25, now, 0.1, 0.18);
+            }
+        }
+
+        // Offline SpeechSynthesis (built into iOS, Android, Windows, macOS)
+        function speakEncouragement(text, force = false) {
+            const now = Date.now();
+            if (!force && now - lastSpokenTime < 3500) return;
+            lastSpokenTime = now;
+
+            if ('speechSynthesis' in window) {
+                try {
+                    if (!preferredCheerfulVoice) loadCheerfulVoice();
+                    window.speechSynthesis.cancel();
+                    const utter = new SpeechSynthesisUtterance(text);
+                    if (preferredCheerfulVoice) {
+                        utter.voice = preferredCheerfulVoice;
+                    }
+                    // Lively, upbeat tempo and bright high pitch for a cheerful cartoon/teacher tone
+                    utter.rate = 1.05;
+                    utter.pitch = 1.48;
+                    utter.volume = 1.0;
+                    window.speechSynthesis.speak(utter);
+                } catch (e) {}
+            }
+        }
+
+        // --- 3. CANVAS & TRACING STATE ---
+        const canvas = document.getElementById('trace-canvas');
+        const ctx = canvas.getContext('2d');
+        const msgPill = document.getElementById('encouragement-pill');
+        const starOverlay = document.getElementById('star-celebration-overlay');
+        const nextBottomBtn = document.getElementById('btn-next-bottom');
+
+        let currentLetterIdx = 0;
+        let starsEarned = 0;
+
+        // Tracing progress state
+        let strokeWaypoints = [];       // Dense array of {x, y} points per stroke
+        let completedStrokes = [];      // Indices of finished strokes
+        let activeStrokeIdx = 0;        // Stroke currently being traced
+        let currentWaypointIdx = 0;     // Progress along activeStrokeIdx
+        let isDrawing = false;
+        let isLetterFinished = false;
+        let userFreeTrail = [];         // Smooth finger trail on current stroke
+        let hasSpokenMidwayEncouragement = false;
+
+        // Celebration Star Particles & Guide Animation
+        let particles = [];
+        let guidePulse = 0;
+
+        const MIDWAY_COMPLIMENTS = [
+            "You can do it! 🌟",
+            "Keep going, superstar! ✨",
+            "Great job tracing! 👏",
+            "You're doing amazing! 🎈",
+            "Almost there, yay! 🌈"
+        ];
+
+        const FINISH_COMPLIMENTS = [
+            "Awesome job! ⭐",
+            "You did it! Superstar! 🌟",
+            "Wonderful tracing! 🎉",
+            "Hooray! You're a star! ⭐"
+        ];
+
+        // --- 4. RESIZE & WAYPOINT GENERATION ---
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = Math.floor(rect.width * dpr);
+            canvas.height = Math.floor(rect.height * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            buildWaypointsForCurrentLetter();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // Subdivide normalized letter stroke paths into evenly spaced checkpoints
+        function buildWaypointsForCurrentLetter() {
+            const w = canvas.clientWidth;
+            const h = canvas.clientHeight;
+            const size = Math.min(w, h);
+            const offsetX = (w - size) / 2;
+            const offsetY = (h - size) / 2;
+
+            const letterObj = LETTERS[currentLetterIdx];
+            strokeWaypoints = letterObj.strokes.map(poly => {
+                const dense = [];
+                const stepDist = Math.max(14, size * 0.038); // Toddler-friendly checkpoint spacing
+
+                for (let i = 0; i < poly.length - 1; i++) {
+                    const p1 = { x: offsetX + poly[i][0] * size, y: offsetY + poly[i][1] * size };
+                    const p2 = { x: offsetX + poly[i + 1][0] * size, y: offsetY + poly[i + 1][1] * size };
+                    const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                    const steps = Math.max(1, Math.floor(dist / stepDist));
+
+                    for (let s = 0; s < steps; s++) {
+                        const t = s / steps;
+                        dense.push({
+                            x: p1.x + (p2.x - p1.x) * t,
+                            y: p1.y + (p2.y - p1.y) * t
+                        });
+                    }
+                }
+                const lastPt = poly[poly.length - 1];
+                dense.push({
+                    x: offsetX + lastPt[0] * size,
+                    y: offsetY + lastPt[1] * size
+                });
+                return dense;
+            });
+        }
+
+        function setEncouragementMessage(text, isCelebrate = false) {
+            msgPill.textContent = text;
+            if (isCelebrate) {
+                msgPill.classList.add('celebrate');
+            } else {
+                msgPill.classList.remove('celebrate');
+            }
+        }
+
+        function loadLetter(index, shouldSpeak = true) {
+            currentLetterIdx = (index + LETTERS.length) % LETTERS.length;
+            const letterObj = LETTERS[currentLetterIdx];
+
+            document.getElementById('header-letter-label').textContent = `Letter ${letterObj.char}`;
+            completedStrokes = [];
+            activeStrokeIdx = 0;
+            currentWaypointIdx = 0;
+            userFreeTrail = [];
+            isDrawing = false;
+            isLetterFinished = false;
+            hasSpokenMidwayEncouragement = false;
+
+            starOverlay.classList.remove('show');
+            nextBottomBtn.classList.add('hidden');
+
+            buildWaypointsForCurrentLetter();
+            const promptText = `Trace the letter ${letterObj.char}!`;
+            setEncouragementMessage(promptText, false);
+
+            if (shouldSpeak) {
+                speakEncouragement(`${letterObj.char}... ${letterObj.char} is for ${letterObj.word}. You can do it!`, true);
+            }
+        }
+
+        // --- 5. TOUCH & MOUSE TRACING LOGIC (FORGIVING FOR TODDLER FINGERS) ---
+        function getPointerPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function handlePointerDown(e) {
+            e.preventDefault();
+            initAudio();
+            if (isLetterFinished) return;
+
+            const pos = getPointerPos(e);
+            const activePoints = strokeWaypoints[activeStrokeIdx];
+            if (!activePoints) return;
+
+            // Generous hit radius (58px) so toddler fingers easily catch the starting dot
+            const targetPt = activePoints[currentWaypointIdx];
+            const dist = Math.hypot(pos.x - targetPt.x, pos.y - targetPt.y);
+
+            if (dist <= 65) {
+                isDrawing = true;
+                userFreeTrail.push(pos);
+                advanceTracing(pos);
+            } else {
+                // Gentle encouraging nudge if toddler taps slightly away from the start dot
+                setEncouragementMessage("Start at the glowing dot! You can do it! ✨", false);
+                speakEncouragement("Start at the glowing dot! You can do it!");
+            }
+        }
+
+        function handlePointerMove(e) {
+            e.preventDefault();
+            if (!isDrawing || isLetterFinished) return;
+
+            const pos = getPointerPos(e);
+            userFreeTrail.push(pos);
+            if (userFreeTrail.length > 40) userFreeTrail.shift();
+
+            advanceTracing(pos);
+        }
+
+        function handlePointerUp(e) {
+            if (e) e.preventDefault();
+            isDrawing = false;
+            userFreeTrail = [];
+        }
+
+        function advanceTracing(pos) {
+            const activePoints = strokeWaypoints[activeStrokeIdx];
+            if (!activePoints) return;
+
+            // Allow toddler's finger to smoothly sweep through upcoming checkpoints within 56px
+            const hitRadius = 56;
+            let advanced = false;
+
+            while (currentWaypointIdx < activePoints.length) {
+                const wp = activePoints[currentWaypointIdx];
+                const d = Math.hypot(pos.x - wp.x, pos.y - wp.y);
+                if (d <= hitRadius) {
+                    spawnMiniSparkles(wp.x, wp.y, 4);
+                    currentWaypointIdx++;
+                    advanced = true;
+                } else {
+                    break;
+                }
+            }
+
+            if (advanced) {
+                playSoundEffect('dot');
+
+                // Give a cheerful "You can do it!" / "Keep going!" compliment midway
+                const progressRatio = currentWaypointIdx / activePoints.length;
+                if (progressRatio >= 0.45 && !hasSpokenMidwayEncouragement) {
+                    hasSpokenMidwayEncouragement = true;
+                    const phrase = MIDWAY_COMPLIMENTS[Math.floor(Math.random() * MIDWAY_COMPLIMENTS.length)];
+                    setEncouragementMessage(phrase, false);
+                    speakEncouragement(phrase.replace(/[^\w\s!'.,]/g, ''));
+                }
+
+                // Check if current stroke is completed
+                if (currentWaypointIdx >= activePoints.length) {
+                    completedStrokes.push(activeStrokeIdx);
+                    activeStrokeIdx++;
+                    currentWaypointIdx = 0;
+                    userFreeTrail = [];
+                    isDrawing = false;
+                    hasSpokenMidwayEncouragement = false;
+
+                    if (activeStrokeIdx >= strokeWaypoints.length) {
+                        // ALL STROKES COMPLETED!
+                        completeCurrentLetter();
+                    } else {
+                        playSoundEffect('strokeComplete');
+                        setEncouragementMessage("Great job! Now trace the next line! 🌟", false);
+                        speakEncouragement("Great job! Now trace the next line!", true);
+                    }
+                }
+            }
+        }
+
+        function completeCurrentLetter() {
+            isLetterFinished = true;
+            starsEarned++;
+            document.getElementById('star-count').textContent = starsEarned;
+
+            playSoundEffect('letterComplete');
+            const winPhrase = FINISH_COMPLIMENTS[Math.floor(Math.random() * FINISH_COMPLIMENTS.length)];
+            setEncouragementMessage(winPhrase, true);
+
+            const letterObj = LETTERS[currentLetterIdx];
+            speakEncouragement(`Awesome job! You traced the letter ${letterObj.char}! Here is a star for you!`, true);
+
+            // Show Big Happy Star + Burst of Star Particles
+            starOverlay.classList.add('show');
+            nextBottomBtn.classList.remove('hidden');
+
+            const cx = canvas.clientWidth / 2;
+            const cy = canvas.clientHeight / 2;
+            spawnMiniSparkles(cx, cy, 45);
+        }
+
+        // --- 6. STAR PARTICLES & RENDERING LOOP ---
+        function spawnMiniSparkles(x, y, count) {
+            const colors = ['#FFDE00', '#FF595E', '#1982C4', '#8AC926', '#FF924C', '#FF66A3'];
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 4.5 + 1.5;
+                particles.push({
+                    x,
+                    y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 1.5,
+                    size: Math.random() * 8 + 5,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    alpha: 1,
+                    rotation: Math.random() * Math.PI
+                });
+            }
+        }
+
+        function drawStrokePath(points, strokeWidth, color, dashed = false) {
+            if (!points || points.length < 2) return;
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = strokeWidth;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            if (dashed) {
+                ctx.setLineDash([strokeWidth * 0.45, strokeWidth * 0.55]);
+            }
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function renderLoop() {
+            const w = canvas.clientWidth;
+            const h = canvas.clientHeight;
+            ctx.clearRect(0, 0, w, h);
+
+            const letterObj = LETTERS[currentLetterIdx];
+            // Extra-wide toddler-friendly stroke thickness
+            const trackWidth = Math.max(44, Math.min(w, h) * 0.135);
+
+            // 1. Draw the full letter soft background track (easier for toddlers to see & stay inside)
+            strokeWaypoints.forEach(pts => {
+                drawStrokePath(pts, trackWidth, '#E2E8F0', false);
+                drawStrokePath(pts, trackWidth * 0.12, '#94A3B8', true);
+            });
+
+            // 2. Draw already completed strokes in vibrant color
+            completedStrokes.forEach(sIdx => {
+                drawStrokePath(strokeWaypoints[sIdx], trackWidth * 0.88, letterObj.color, false);
+            });
+
+            // 3. Draw partially traced progress on the active stroke
+            if (!isLetterFinished && strokeWaypoints[activeStrokeIdx]) {
+                const activePts = strokeWaypoints[activeStrokeIdx];
+                if (currentWaypointIdx > 0) {
+                    const tracedSlice = activePts.slice(0, currentWaypointIdx + 1);
+                    drawStrokePath(tracedSlice, trackWidth * 0.88, letterObj.color, false);
+                }
+
+                // Draw smooth live finger trail
+                if (isDrawing && userFreeTrail.length > 1) {
+                    drawStrokePath(userFreeTrail, trackWidth * 0.45, 'rgba(255, 222, 0, 0.75)', false);
+                }
+
+                // 4. Draw Animated Guiding Dot & Little Finger Gesture Hint
+                guidePulse += 0.08;
+                const targetPt = activePts[Math.min(currentWaypointIdx, activePts.length - 1)];
+
+                // Outer pulsing halo
+                const haloRadius = (trackWidth * 0.52) + Math.sin(guidePulse) * 6;
+                ctx.save();
+                ctx.fillStyle = 'rgba(255, 222, 0, 0.45)';
+                ctx.beginPath();
+                ctx.arc(targetPt.x, targetPt.y, haloRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Inner bright target circle
+                ctx.fillStyle = '#FFDE00';
+                ctx.strokeStyle = '#FF8C00';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(targetPt.x, targetPt.y, trackWidth * 0.34, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Animated bouncing pointer gesture when toddler hasn't touched yet
+                if (!isDrawing && currentWaypointIdx < activePts.length - 1) {
+                    const nextPt = activePts[Math.min(currentWaypointIdx + 3, activePts.length - 1)];
+                    const lerp = (Math.sin(guidePulse * 0.7) + 1) / 2;
+                    const gx = targetPt.x + (nextPt.x - targetPt.x) * lerp;
+                    const gy = targetPt.y + (nextPt.y - targetPt.y) * lerp;
+
+                    // Draw cute little white glove / finger indicator
+                    ctx.font = `${Math.round(trackWidth * 0.75)}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('👆', gx, gy + trackWidth * 0.48);
+                }
+                ctx.restore();
+            }
+
+            // 5. Update & Draw Celebration Star Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.12;
+                p.alpha -= 0.016;
+                p.rotation += 0.07;
+
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                for (let s = 0; s < 5; s++) {
+                    ctx.lineTo(Math.cos((18 + s * 72) * Math.PI / 180) * p.size,
+                               -Math.sin((18 + s * 72) * Math.PI / 180) * p.size);
+                    ctx.lineTo(Math.cos((54 + s * 72) * Math.PI / 180) * (p.size * 0.45),
+                               -Math.sin((54 + s * 72) * Math.PI / 180) * (p.size * 0.45));
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+
+            requestAnimationFrame(renderLoop);
+        }
+
+        // --- 7. EVENT BINDINGS (TOUCH, MOUSE & NAVIGATION ARROWS) ---
+        canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+        canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+        canvas.addEventListener('touchend', handlePointerUp, { passive: false });
+        canvas.addEventListener('touchcancel', handlePointerUp, { passive: false });
+
+        canvas.addEventListener('mousedown', handlePointerDown);
+        window.addEventListener('mousemove', handlePointerMove);
+        window.addEventListener('mouseup', handlePointerUp);
+
+        // Left (Back) and Right (Next) Arrow Buttons
+        document.getElementById('btn-prev').addEventListener('click', () => {
+            initAudio();
+            playSoundEffect('nav');
+            loadLetter(currentLetterIdx - 1, true);
+        });
+
+        document.getElementById('btn-next').addEventListener('click', () => {
+            initAudio();
+            playSoundEffect('nav');
+            loadLetter(currentLetterIdx + 1, true);
+        });
+
+        document.getElementById('btn-next-bottom').addEventListener('click', () => {
+            initAudio();
+            playSoundEffect('nav');
+            loadLetter(currentLetterIdx + 1, true);
+        });
+
+        // Reset current letter button
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            initAudio();
+            playSoundEffect('nav');
+            loadLetter(currentLetterIdx, true);
+        });
+
+        // Tap top letter pill to hear the letter & encouragement again
+        document.getElementById('btn-speak-letter').addEventListener('click', () => {
+            initAudio();
+            const letterObj = LETTERS[currentLetterIdx];
+            speakEncouragement(`${letterObj.char}... ${letterObj.char} is for ${letterObj.word}. You can do it!`, true);
+        });
+
+        // Keyboard left/right support for desktop/iPad keyboards
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') loadLetter(currentLetterIdx - 1, true);
+            else if (e.key === 'ArrowRight') loadLetter(currentLetterIdx + 1, true);
+        });
+
+        // Initialize on load
+        window.onload = () => {
+            resizeCanvas();
+            loadLetter(0, false);
+            requestAnimationFrame(renderLoop);
+        };
+    </script>
+</body>
+</html>
